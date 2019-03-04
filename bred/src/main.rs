@@ -9,7 +9,7 @@ fn main() {
         Ok(_) => {
             match term::Term::from_str(&input) {
                 Ok(t) => {
-                    println!("{}", term::reduce(&t));
+                    println!("{}", term::normal_form(&t, term::Strategy::Normal));
                 },
                 Err(error) => {
                     println!("error: {:?}", error);
