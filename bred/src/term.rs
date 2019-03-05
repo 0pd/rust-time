@@ -139,9 +139,9 @@ mod tests {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
-        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id))), Box::new(big_omega));
+        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
 
-        assert_eq!(Term::Var(1), normal_form(&term, Strategy::Normal));
+        assert_eq!(id, normal_form(&term, Strategy::Normal));
     }
 
     #[test]
@@ -151,8 +151,8 @@ mod tests {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
-        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id))), Box::new(big_omega));
+        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
 
-        assert_eq!(Term::Var(1), normal_form(&term, Strategy::Applicative));
+        assert_eq!(id, normal_form(&term, Strategy::Applicative));
     }
 }
