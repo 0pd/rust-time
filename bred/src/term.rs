@@ -91,7 +91,7 @@ fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
         Strategy::Normal => match reduce(fun, strategy) {
             Some(term) => Some(Term::App(Box::new(term), Box::new(arg.clone()))),
             None => match fun {
-                Term::Abs(v, b) => Some(substitute(*v, arg, b)),
+                Term::Abs(v, b) => Some(substitute(0, arg, b)), // not sure I should start substitution from 0
                 _ => match reduce(arg, strategy) {
                     Some(term) => Some(Term::App(Box::new(fun.clone()), Box::new(term))),
                     None => None
@@ -103,7 +103,7 @@ fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
             None => match reduce(fun, strategy) {
                 Some(term) => Some(Term::App(Box::new(term), Box::new(arg.clone()))),
                 None => match fun {
-                    Term::Abs(v, b) => Some(substitute(*v, arg, b)),
+                    Term::Abs(v, b) => Some(substitute(0, arg, b)), // not sure I should start substitution from 0
                     _ => None
                 }
             }
@@ -123,6 +123,7 @@ fn reduce(term: &Term, strategy: Strategy) -> Option<Term> {
 }
 
 pub fn normal_form(term: &Term, strategy: Strategy) -> Term {
+    println!("{:?}", term);
     match reduce(term, strategy) {
         Some(t) => normal_form(&t, strategy),
         None => term.clone(),
@@ -190,6 +191,15 @@ mod tests {
         let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
 
         assert_eq!(id, normal_form(&term, Strategy::Applicative));
+    }
+
+    #[test]
+    fn test_reduce_appliation_to_id() {
+        let x = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let term = Term::App(Box::new(x), Box::new(id));
+
+        assert_eq!(Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(0))))), normal_form(&term, Strategy::Normal));
     }
 
     #[test]
