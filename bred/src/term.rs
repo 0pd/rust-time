@@ -66,21 +66,18 @@ pub enum Strategy {
     Applicative
 }
 
-fn shift(d: u32, c: u32, term: &Term) -> Term {
-    match term {
-        Term::App(f, a) => Term::App(Box::new(shift(d, c, f)), Box::new(shift(d, c, a))),
-        Term::Abs(v, f) => Term::Abs(*v, Box::new(shift(d, c + 1, f))),
-        Term::Var(v) if *v < c => Term::Var(*v),
-        Term::Var(v) => Term::Var(v + d)
+pub fn normal_form(term: &Term, strategy: Strategy) -> Term {
+    match reduce(term, strategy) {
+        Some(t) => normal_form(&t, strategy),
+        None => term.clone(),
     }
 }
 
-fn substitute(var: u32, arg: &Term, function: &Term) -> Term {
-    match function {
-        Term::App(f, a) => Term::App(Box::new(substitute(var, arg, f)), Box::new(substitute(var, arg, a))),
-        Term::Abs(v, f) => Term::Abs(*v, Box::new(substitute(var + 1, &shift(1, 0, arg), f))),
-        Term::Var(v) if *v == var => arg.clone(),
-        Term::Var(_) => function.clone()
+fn reduce(term: &Term, strategy: Strategy) -> Option<Term> {
+    match term {
+        Term::App(f, a) => handle_app(f, a, strategy),
+        Term::Abs(v, f) => reduce(f, strategy).map(|t| Term::Abs(*v, Box::new(t))),
+        _ => None
     }
 }
 
@@ -103,19 +100,21 @@ fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
     }
 }
 
-fn reduce(term: &Term, strategy: Strategy) -> Option<Term> {
-    match term {
-        Term::App(f, a) => handle_app(f, a, strategy),
-        Term::Abs(v, f) => reduce(f, strategy).map(|t| Term::Abs(*v, Box::new(t))),
-        _ => None
+fn substitute(var: u32, arg: &Term, function: &Term) -> Term {
+    match function {
+        Term::App(f, a) => Term::App(Box::new(substitute(var, arg, f)), Box::new(substitute(var, arg, a))),
+        Term::Abs(v, f) => Term::Abs(*v, Box::new(substitute(var + 1, &shift(1, 0, arg), f))),
+        Term::Var(v) if *v == var => arg.clone(),
+        Term::Var(_) => function.clone()
     }
 }
 
-pub fn normal_form(term: &Term, strategy: Strategy) -> Term {
-    println!("{:?}", term);
-    match reduce(term, strategy) {
-        Some(t) => normal_form(&t, strategy),
-        None => term.clone(),
+fn shift(d: u32, c: u32, term: &Term) -> Term {
+    match term {
+        Term::App(f, a) => Term::App(Box::new(shift(d, c, f)), Box::new(shift(d, c, a))),
+        Term::Abs(v, f) => Term::Abs(*v, Box::new(shift(d, c + 1, f))),
+        Term::Var(v) if *v < c => Term::Var(*v),
+        Term::Var(v) => Term::Var(v + d)
     }
 }
 
