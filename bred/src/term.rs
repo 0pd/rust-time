@@ -1,12 +1,47 @@
 use std::fmt;
 use std::str::FromStr;
+use std::ops::Deref;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum Term {
     App(Box<Term>, Box<Term>),
     Abs(u32, Box<Term>),
     Var(u32)
 }
+
+impl PartialEq for Term {
+    fn eq(&self, other: &Term) -> bool {
+        match self {
+            Term::App(f_self, a_self) => {
+                if let Term::App(f_other, a_other) = other {
+                    f_self == f_other && a_self == a_other
+                } else {
+                    false
+                }
+            },
+            Term::Abs(v_self, f_self) => {
+                if let Term::Abs(v_other, f_other) = other {
+                    if v_self == v_other {
+                        f_self == f_other
+                    } else {
+                        *f_self.deref() == substitute(*v_other, &Term::Var(*v_self), f_other)
+                    }
+                } else {
+                    false
+                }
+            },
+            Term::Var(v_self) => {
+                if let Term::Var(v_other) = other {
+                    v_other == v_self
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
+impl Eq for Term {}
 
 impl fmt::Display for Term {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -50,6 +85,7 @@ fn substitute(var: u32, arg: &Term, function: &Term) -> Term {
 }
 
 // dirty hack, IDK how to handle Box<Term> with match arms
+// try deref
 fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
     match strategy {
         Strategy::Normal => match reduce(fun, strategy) {
@@ -154,5 +190,13 @@ mod tests {
         let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
 
         assert_eq!(id, normal_form(&term, Strategy::Applicative));
+    }
+
+    #[test]
+    fn test_eq_id() {
+        let id0 = Term::Abs(0, Box::new(Term::Var(0)));
+        let id1 = Term::Abs(1, Box::new(Term::Var(1)));
+
+        assert_eq!(id0, id1);
     }
 }
