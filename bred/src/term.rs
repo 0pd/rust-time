@@ -80,44 +80,33 @@ fn substitute(var: u32, arg: &Term, function: &Term) -> Term {
         Term::App(f, a) => Term::App(Box::new(substitute(var, arg, f)), Box::new(substitute(var, arg, a))),
         Term::Abs(v, f) => Term::Abs(*v, Box::new(substitute(var + 1, &shift(1, 0, arg), f))),
         Term::Var(v) if *v == var => arg.clone(),
-        Term::Var(v) => function.clone()
+        Term::Var(_) => function.clone()
     }
 }
 
-// dirty hack, IDK how to handle Box<Term> with match arms
-// try deref
 fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
     match strategy {
-        Strategy::Normal => match reduce(fun, strategy) {
-            Some(term) => Some(Term::App(Box::new(term), Box::new(arg.clone()))),
-            None => match fun {
-                Term::Abs(v, b) => Some(substitute(0, arg, b)), // not sure I should start substitution from 0
-                _ => match reduce(arg, strategy) {
-                    Some(term) => Some(Term::App(Box::new(fun.clone()), Box::new(term))),
-                    None => None
-                }
+        Strategy::Normal => reduce(fun, strategy).map_or_else(|| {
+            if let Term::Abs(_, b) = fun {
+                Some(substitute(0, arg, b))
+            } else {
+                reduce(arg, strategy).map(|term| Term::App(Box::new(fun.clone()), Box::new(term)))
             }
-        },
-        Strategy::Applicative => match reduce(arg, strategy) {
-            Some(term) => Some(Term::App(Box::new(fun.clone()), Box::new(term))),
-            None => match reduce(fun, strategy) {
-                Some(term) => Some(Term::App(Box::new(term), Box::new(arg.clone()))),
-                None => match fun {
-                    Term::Abs(v, b) => Some(substitute(0, arg, b)), // not sure I should start substitution from 0
-                    _ => None
-                }
+        }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) }),
+        Strategy::Applicative => reduce(arg, strategy).map_or_else(|| {
+            if let Term::Abs(_, b) = fun {
+                Some(substitute(0, arg, b))
+            } else {
+                None
             }
-        }
+        }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) })
     }
 }
 
 fn reduce(term: &Term, strategy: Strategy) -> Option<Term> {
     match term {
         Term::App(f, a) => handle_app(f, a, strategy),
-        Term::Abs(v, f) => match reduce(f, strategy) {
-            Some(t) => Some(Term::Abs(*v, Box::new(t))),
-            None => None
-        },
+        Term::Abs(v, f) => reduce(f, strategy).map(|t| Term::Abs(*v, Box::new(t))),
         _ => None
     }
 }
