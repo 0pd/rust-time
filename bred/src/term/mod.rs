@@ -313,4 +313,50 @@ mod tests {
         assert_eq!(true, converted.is_ok());
         assert_eq!(term, converted.unwrap());
     }
+
+    #[test]
+    fn test_from_str_abs_in_abs_without_parentheses() {
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let term = Term::Abs(1, Box::new(Term::App(Box::new(Term::Var(1)), Box::new(id))));
+        let converted = Term::from_str("\\1. 1 \\0. 0");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_app_three_times() {
+        let term = Term::Abs(0, Box::new(Term::App(Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))));
+        let converted = Term::from_str("\\0. 0 0 0");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_outer_parentheses() {
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let converted = Term::from_str("(\\0. 0)");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(id, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_many_outer_parentheses() {
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let converted = Term::from_str("((\\0. 0))");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(id, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_redundant_parentheses() {
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let converted = Term::from_str("\\0. (0)");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(id, converted.unwrap());
+    }
 }

@@ -8,15 +8,41 @@ pub struct Parser {}
 
 impl Parser {
     pub fn parse(s: &str) -> Result<Term, ParseError> {
-        Self::parse_term(s, &mut 0).ok_or(ParseError {})
+        Self::parse_term_despite_of_fucking_parentheses(s, &mut 0).ok_or(ParseError {})
+    }
+
+    fn parse_term_despite_of_fucking_parentheses(s: &str, i: &mut usize) -> Option<Term> {
+        Some(()).skip(s, i, ' ').and_then(|_| {
+            Self::parse_term_in_parentheses(s, i).or_else(|| {
+                Self::parse_term(s, i)
+            })
+        })
     }
 
     fn parse_term(s: &str, i: &mut usize) -> Option<Term> {
-        Self::parse_abs(s, i).map_or_else(|| {
-            Self::parse_app(s, i).map_or_else(|| {
-                Self::parse_var(s, i)
-            }, |app| { Some(app) })
-        }, |abs| { Some(abs) })
+        let mut index = *i;
+
+        Self::parse_abs(s, &mut index).or_else(|| {
+            Self::parse_app(s, &mut index).or_else(|| {
+                Self::parse_var(s, &mut index)
+            })
+        }).map(|t| {
+            *i = index;
+            t
+        }).debug("__T")
+    }
+
+    fn parse_term_in_parentheses(s: &str, i: &mut usize) -> Option<Term> {
+        let mut index = *i;
+
+        Self::parse_symbol(s, &mut index, '(').and_then(|_| {
+            Self::parse_term_despite_of_fucking_parentheses(s, &mut index).and_then(|t| {
+                Self::parse_symbol(s, &mut index, ')').map(|_| {
+                    *i = index;
+                    t
+                })
+            })
+        }).skip(s, i, ' ').debug("(T)")
     }
 
     fn parse_abs(s: &str, i: &mut usize) -> Option<Term> {
@@ -31,7 +57,7 @@ impl Parser {
                     })
                 })
             })
-        }).debug()
+        }).skip(s, i, ' ').debug("Abs")
     }
 
     fn parse_app(s: &str, i: &mut usize) -> Option<Term> {
@@ -40,41 +66,28 @@ impl Parser {
         Self::parse_var(s, &mut index).or_else(|| {
             Self::parse_term_in_parentheses(s, &mut index)
         }).and_then(|f| {
-            Self::parse_symbol(s, &mut index, ' ').and_then(|_| {
-                Self::parse_var(s, &mut index).or_else(|| {
-                    Self::parse_term_in_parentheses(s, &mut index)
-                }).map(|a| {
-                    Term::App(Box::new(f), Box::new(a))
+            Self::parse_var(s, &mut index).or_else(|| {
+                Self::parse_term_in_parentheses(s, &mut index).or_else(|| {
+                    Self::parse_term(s, &mut index)
                 })
+            }).map(|a| {
+                Term::App(Box::new(f), Box::new(a))
             })
         }).map(|t| {
             *i = index;
             t
-        }).debug()
-    }
-
-    fn parse_term_in_parentheses(s: &str, i: &mut usize) -> Option<Term> {
-        let mut index = *i;
-
-        Self::parse_symbol(s, &mut index, '(').and_then(|_| {
-            Self::parse_term(s, &mut index).and_then(|t| {
-                Self::parse_symbol(s, &mut index, ')').map(|_| {
-                    *i = index;
-                    t
-                })
-            })
-        }).debug()
+        }).skip(s, i, ' ').debug("App")
     }
 
     fn parse_var(s: &str, i: &mut usize) -> Option<Term> {
-        Self::parse_number(s, i).map(|n| { Term::Var(n) })
+        Self::parse_number(s, i).map(|n| { Term::Var(n) }).skip(s, i, ' ')
     }
 
     fn parse_symbol(s: &str, i: &mut usize, symbol: char) -> Option<()> {
         s.chars().skip(*i).next().filter(|c| { *c == symbol }).map(|_| {
             *i += 1;
             ()
-        })
+        }).skip(s, i, ' ')
     }
 
     fn parse_number(s: &str, i: &mut usize) -> Option<u32> {
@@ -87,24 +100,35 @@ impl Parser {
         u32::from_str(&s[*i..*i + count]).ok().map(|n| {
             *i += count;
             n
-        })
+        }).skip(s, i, ' ')
     }
+}
 
-    fn space_shift(s: &str, head: usize) -> usize {
-        let tail = s.chars().skip(head).skip_while(|c| { c.is_whitespace() }).count();
-        s.len() - head - tail
+trait Skip {
+    fn skip(self, s: &str, i: &mut usize, symbol: char) -> Self;
+}
+
+impl<T> Skip for Option<T> {
+    fn skip(self, s: &str, i: &mut usize, symbol: char) -> Self {
+        let count = s.chars().skip(*i).take_while(|c| { *c == symbol }).count();
+        *i += count;
+
+        self
     }
 }
 
 trait Dbug {
-    fn debug(self) -> Self;
+    fn debug(self, message: &str) -> Self;
 }
 
 impl Dbug for Option<Term> {
-    fn debug(self) -> Self  {
-        self.map(|t| {
-            println!("{:?}", t);
-            t
+    fn debug(self, message: &str) -> Self {
+        self.map_or_else(|| {
+            println!("{}", message);
+            None
+        }, |t| {
+            println!("{}: {}", message, t);
+            Some(t)
         })
     }
 }
