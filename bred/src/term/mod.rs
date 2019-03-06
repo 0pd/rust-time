@@ -1,6 +1,11 @@
+mod parser;
+
 use std::fmt;
 use std::str::FromStr;
 use std::ops::Deref;
+
+pub use parser::ParseError;
+use parser::Parser;
 
 #[derive(Debug, Clone)]
 pub enum Term {
@@ -61,14 +66,11 @@ impl fmt::Display for Term {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum ParseError {}
-
 impl FromStr for Term {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        unimplemented!()
+        Parser::parse(s)
     }
 }
 
@@ -240,5 +242,75 @@ mod tests {
         let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
         assert_eq!("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) (\\0. 0 0))", format!("{}", term));
+    }
+
+    #[test]
+    fn test_from_str_var() {
+        let term = Term::from_str("0");
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!(Term::Var(0), Term::from_str("0").unwrap())
+    }
+
+    #[test]
+    fn test_from_str_id() {
+        let term = Term::from_str("\\0.0");
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!(id, term.unwrap())
+    }
+
+    #[test]
+    fn test_from_str_id_whitespaced() {
+        let term = Term::from_str("\\0. 0");
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!(id, term.unwrap())
+    }
+
+    #[test]
+    fn test_from_str_fst() {
+        let term = Term::from_str("\\1.\\0.1");
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!(fst, term.unwrap())
+    }
+
+    #[test]
+    fn test_from_str_fst_whitespaced() {
+        let term = Term::from_str("\\1. \\0. 1");
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!(fst, term.unwrap())
+    }
+
+    #[test]
+    fn test_from_str_omega() {
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
+        let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
+        let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
+        let converted = Term::from_str("((\\1.\\0.1) (\\0.0)) ((\\0.0 0) (\\0.0 0))");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_omega_whitespaced() {
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
+        let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
+        let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
+        let converted = Term::from_str("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) (\\0. 0 0))");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
     }
 }
