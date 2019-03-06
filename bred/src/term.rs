@@ -6,7 +6,7 @@ use std::ops::Deref;
 pub enum Term {
     App(Box<Term>, Box<Term>),
     Abs(u32, Box<Term>),
-    Var(u32)
+    Var(u32),
 }
 
 impl PartialEq for Term {
@@ -18,7 +18,7 @@ impl PartialEq for Term {
                 } else {
                     false
                 }
-            },
+            }
             Term::Abs(v_self, f_self) => {
                 if let Term::Abs(v_other, f_other) = other {
                     if v_self == v_other {
@@ -29,7 +29,7 @@ impl PartialEq for Term {
                 } else {
                     false
                 }
-            },
+            }
             Term::Var(v_self) => {
                 if let Term::Var(v_other) = other {
                     v_other == v_self
@@ -45,7 +45,19 @@ impl Eq for Term {}
 
 impl fmt::Display for Term {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
+        match self {
+            Term::App(f, a) => {
+                if let Term::Abs(_, _) = *f.deref() {
+                    write!(formatter, "({}) ({})", f, a)
+                } else if let Term::Var(_) = *a.deref() {
+                    write!(formatter, "{} {}", f, a)
+                } else {
+                    write!(formatter, "{} ({})", f, a)
+                }
+            }
+            Term::Abs(a, f) => write!(formatter, "\\{}. {}", a, f),
+            Term::Var(v) => write!(formatter, "{}", v)
+        }
     }
 }
 
@@ -63,7 +75,7 @@ impl FromStr for Term {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
     Normal,
-    Applicative
+    Applicative,
 }
 
 pub fn normal_form(term: &Term, strategy: Strategy) -> Term {
@@ -160,11 +172,11 @@ mod tests {
 
     #[test]
     fn test_reduce_application_to_omega_normal() {
-        let x = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
-        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
+        let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
         assert_eq!(id, normal_form(&term, Strategy::Normal));
     }
@@ -172,17 +184,17 @@ mod tests {
     #[test]
     #[ignore]
     fn test_reduce_application_to_omega_applicative() {
-        let x = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
-        let term = Term::App(Box::new(Term::App(Box::new(x), Box::new(id.clone()))), Box::new(big_omega));
+        let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
         assert_eq!(id, normal_form(&term, Strategy::Applicative));
     }
 
     #[test]
-    fn test_reduce_appliation_to_id() {
+    fn test_reduce_application_to_id() {
         let x = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let term = Term::App(Box::new(x), Box::new(id));
@@ -196,5 +208,37 @@ mod tests {
         let id1 = Term::Abs(1, Box::new(Term::Var(1)));
 
         assert_eq!(id0, id1);
+    }
+
+    #[test]
+    fn test_format_var() {
+        let var = Term::Var(0);
+
+        assert_eq!("0", format!("{}", var));
+    }
+
+    #[test]
+    fn test_format_id() {
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+
+        assert_eq!("\\0. 0", format!("{}", id));
+    }
+
+    #[test]
+    fn test_format_fst() {
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+
+        assert_eq!("\\1. \\0. 1", format!("{}", fst));
+    }
+
+    #[test]
+    fn test_format_application_to_omega() {
+        let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
+        let id = Term::Abs(0, Box::new(Term::Var(0)));
+        let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
+        let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
+        let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
+
+        assert_eq!("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) (\\0. 0 0))", format!("{}", term));
     }
 }
