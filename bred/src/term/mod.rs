@@ -334,6 +334,15 @@ mod tests {
     }
 
     #[test]
+    fn test_from_str_app_four_times() {
+        let term = Term::Abs(0, Box::new(Term::App(Box::new(Term::App(Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))));
+        let converted = Term::from_str("\\0. 0 0 0 0");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
+    }
+
+    #[test]
     fn test_from_str_outer_parentheses() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let converted = Term::from_str("(\\0. 0)");

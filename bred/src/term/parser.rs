@@ -51,7 +51,7 @@ impl Parser {
         Self::parse_symbol(s, &mut index, '\\').and_then(|_| {
             Self::parse_number(s, &mut index).and_then(|v| {
                 Self::parse_symbol(s, &mut index, '.').and_then(|_| {
-                    Self::parse_term(s, &mut index).map(|t| {
+                    Self::parse_term_despite_of_fucking_parentheses(s, &mut index).map(|t| {
                         *i = index;
                         Term::Abs(v, Box::new(t))
                     })
@@ -67,12 +67,20 @@ impl Parser {
             Self::parse_term_in_parentheses(s, &mut index)
         }).and_then(|f| {
             Self::parse_var(s, &mut index).or_else(|| {
-                Self::parse_term_in_parentheses(s, &mut index).or_else(|| {
-                    Self::parse_term(s, &mut index)
-                })
+                Self::parse_term_despite_of_fucking_parentheses(s, &mut index)
             }).map(|a| {
                 Term::App(Box::new(f), Box::new(a))
             })
+        }).map(|app| {
+            if let Some(term) = Self::parse_term_despite_of_fucking_parentheses(s, &mut index) {
+                if let Term::App(f, a) = term {
+                    Term::App(Box::new(Term::App(Box::new(app), f)), a)
+                } else {
+                    Term::App(Box::new(app), Box::new(term))
+                }
+            } else {
+                app
+            }
         }).map(|t| {
             *i = index;
             t
