@@ -52,12 +52,41 @@ impl fmt::Display for Term {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Term::App(f, a) => {
-                if let Term::Abs(_, _) = f.deref() {
-                    write!(formatter, "({}) ({})", f, a)
-                } else if let Term::Var(_) = a.deref() {
-                    write!(formatter, "{} {}", f, a)
-                } else {
-                    write!(formatter, "{} ({})", f, a)
+                match f.deref() {
+                    Term::Abs(_, _) => if let Term::App(_, _) = a.deref() {
+                        write!(formatter, "({}) ({})", f, a)
+                    } else {
+                        write!(formatter, "({}) {}", f, a)
+                    }
+                    Term::App(_, _) => {
+                        let mut args = vec![];
+
+                        let mut current = f.deref();
+                        while let Term::App(fun, arg) = current {
+                            args.push(arg.deref());
+                            current = fun.deref();
+                        }
+                        args.push(current);
+
+                        while let Some(term) = args.pop() {
+                            if let Term::Var(_) = term {
+                                write!(formatter, "{} ", term)?
+                            } else {
+                                write!(formatter, "({}) ", term)?
+                            }
+                        }
+
+                        if let Term::App(_, _) = a.deref() {
+                            write!(formatter, "({})", a)
+                        } else {
+                            write!(formatter, "{}", a)
+                        }
+                    }
+                    Term::Var(_) => if let Term::App(_, _) = a.deref() {
+                        write!(formatter, "{} ({})", f, a)
+                    } else {
+                        write!(formatter, "{} {}", f, a)
+                    }
                 }
             }
             Term::Abs(a, f) => write!(formatter, "\\{}. {}", a, f),
@@ -249,7 +278,15 @@ mod tests {
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
         let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
-        assert_eq!("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) (\\0. 0 0))", format!("{}", term));
+        assert_eq!("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) \\0. 0 0)", format!("{}", term));
+    }
+
+    #[test]
+    fn format_app_in_abs_four_times() {
+        let term = Term::from_str("\\4. \\3. \\2. \\1. 1 2 3 4");
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!("\\4. \\3. \\2. \\1. 1 2 3 4", format!("{}", term.unwrap()));
     }
 
     #[test]
