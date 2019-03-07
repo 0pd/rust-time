@@ -8,41 +8,28 @@ pub struct Parser {}
 
 impl Parser {
     pub fn parse(s: &str) -> Result<Term, ParseError> {
-        Self::parse_term_despite_of_fucking_parentheses(s, &mut 0).ok_or(ParseError {})
-    }
-
-    fn parse_term_despite_of_fucking_parentheses(s: &str, i: &mut usize) -> Option<Term> {
-        Some(()).skip(s, i, ' ').and_then(|_| {
-            Self::parse_term_in_parentheses(s, i).or_else(|| {
-                Self::parse_term(s, i)
-            })
-        })
+        Self::parse_term(s, &mut 0).ok_or(ParseError {})
     }
 
     fn parse_term(s: &str, i: &mut usize) -> Option<Term> {
-        let mut index = *i;
-
-        Self::parse_abs(s, &mut index).or_else(|| {
-            Self::parse_app(s, &mut index).or_else(|| {
-                Self::parse_var(s, &mut index)
+        Some(()).skip(s, i, ' ').and_then(|_| {
+            Self::parse_app(s, i).or_else(|| {
+                Self::parse_term_in_parentheses(s, i)
             })
-        }).map(|t| {
-            *i = index;
-            t
-        }).debug("__T")
+        })
     }
 
     fn parse_term_in_parentheses(s: &str, i: &mut usize) -> Option<Term> {
         let mut index = *i;
 
         Self::parse_symbol(s, &mut index, '(').and_then(|_| {
-            Self::parse_term_despite_of_fucking_parentheses(s, &mut index).and_then(|t| {
+            Self::parse_term(s, &mut index).and_then(|t| {
                 Self::parse_symbol(s, &mut index, ')').map(|_| {
                     *i = index;
                     t
                 })
             })
-        }).skip(s, i, ' ').debug("(T)")
+        }).skip(s, i, ' ')
     }
 
     fn parse_abs(s: &str, i: &mut usize) -> Option<Term> {
@@ -51,40 +38,38 @@ impl Parser {
         Self::parse_symbol(s, &mut index, '\\').and_then(|_| {
             Self::parse_number(s, &mut index).and_then(|v| {
                 Self::parse_symbol(s, &mut index, '.').and_then(|_| {
-                    Self::parse_term_despite_of_fucking_parentheses(s, &mut index).map(|t| {
+                    Self::parse_term(s, &mut index).map(|t| {
                         *i = index;
                         Term::Abs(v, Box::new(t))
                     })
                 })
             })
-        }).skip(s, i, ' ').debug("Abs")
+        }).skip(s, i, ' ')
     }
 
     fn parse_app(s: &str, i: &mut usize) -> Option<Term> {
         let mut index = *i;
 
-        Self::parse_var(s, &mut index).or_else(|| {
-            Self::parse_term_in_parentheses(s, &mut index)
-        }).and_then(|f| {
-            Self::parse_var(s, &mut index).or_else(|| {
-                Self::parse_term_despite_of_fucking_parentheses(s, &mut index)
-            }).map(|a| {
-                Term::App(Box::new(f), Box::new(a))
-            })
-        }).map(|app| {
-            if let Some(term) = Self::parse_term_despite_of_fucking_parentheses(s, &mut index) {
-                if let Term::App(f, a) = term {
-                    Term::App(Box::new(Term::App(Box::new(app), f)), a)
-                } else {
-                    Term::App(Box::new(app), Box::new(term))
-                }
-            } else {
-                app
+        Self::parse_sub_term(s, &mut index).map(|f| {
+            let mut result = f;
+
+            while let Some(term) = Self::parse_sub_term(s, &mut index) {
+                result = Term::App(Box::new(result), Box::new(term))
             }
+
+            result
         }).map(|t| {
             *i = index;
             t
-        }).skip(s, i, ' ').debug("App")
+        }).skip(s, i, ' ')
+    }
+
+    fn parse_sub_term(s: &str, mut index: &mut usize) -> Option<Term> {
+        Self::parse_var(s, &mut index).or_else(|| {
+            Self::parse_abs(s, &mut index).or_else(|| {
+                Self::parse_term_in_parentheses(s, &mut index)
+            })
+        })
     }
 
     fn parse_var(s: &str, i: &mut usize) -> Option<Term> {
@@ -122,21 +107,5 @@ impl<T> Skip for Option<T> {
         *i += count;
 
         self
-    }
-}
-
-trait Dbug {
-    fn debug(self, message: &str) -> Self;
-}
-
-impl Dbug for Option<Term> {
-    fn debug(self, message: &str) -> Self {
-        self.map_or_else(|| {
-            println!("{}", message);
-            None
-        }, |t| {
-            println!("{}: {}", message, t);
-            Some(t)
-        })
     }
 }

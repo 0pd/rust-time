@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_omega() {
+    fn test_from_str_omega_redundant_parentheses() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_omega_whitespaced() {
+    fn test_from_str_omega() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -337,6 +337,29 @@ mod tests {
     fn test_from_str_app_four_times() {
         let term = Term::Abs(0, Box::new(Term::App(Box::new(Term::App(Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))));
         let converted = Term::from_str("\\0. 0 0 0 0");
+
+        assert_eq!(true, converted.is_ok());
+        assert_eq!(term, converted.unwrap());
+    }
+
+    #[test]
+    fn test_from_str_abs_app_four_times() {
+        let term = Term::Abs(
+            4, Box::new(Term::Abs(
+                3, Box::new(Term::Abs(
+                    2, Box::new(Term::Abs(
+                        1, Box::new(Term::App(
+                            Box::new(Term::App(
+                                Box::new(Term::App(
+                                    Box::new(Term::Var(1)), Box::new(Term::Var(2))
+                                )), Box::new(Term::Var(3))
+                            )), Box::new(Term::Var(4))
+                        ))
+                    ))
+                ))
+            ))
+        );
+        let converted = Term::from_str("\\4. \\3. \\2. \\1. 1 2 3 4");
 
         assert_eq!(true, converted.is_ok());
         assert_eq!(term, converted.unwrap());
