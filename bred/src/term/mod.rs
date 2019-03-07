@@ -52,9 +52,9 @@ impl fmt::Display for Term {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Term::App(f, a) => {
-                if let Term::Abs(_, _) = *f.deref() {
+                if let Term::Abs(_, _) = f.deref() {
                     write!(formatter, "({}) ({})", f, a)
-                } else if let Term::Var(_) = *a.deref() {
+                } else if let Term::Var(_) = a.deref() {
                     write!(formatter, "{} {}", f, a)
                 } else {
                     write!(formatter, "{} ({})", f, a)
