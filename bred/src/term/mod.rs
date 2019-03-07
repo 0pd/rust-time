@@ -137,43 +137,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_reduce_var_normal() {
+    fn reduce_var_normal() {
         let var = Term::Var(0);
         assert_eq!(var, normal_form(&var, Strategy::Normal));
     }
 
     #[test]
-    fn test_reduce_var_applicative() {
+    fn reduce_var_applicative() {
         let var = Term::Var(0);
         assert_eq!(var, normal_form(&var, Strategy::Applicative));
     }
 
     #[test]
-    fn test_reduce_id_normal() {
+    fn reduce_id_normal() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         assert_eq!(id, normal_form(&id, Strategy::Normal));
     }
 
     #[test]
-    fn test_reduce_id_applicative() {
+    fn reduce_id_applicative() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         assert_eq!(id, normal_form(&id, Strategy::Applicative));
     }
 
     #[test]
-    fn test_reduce_application_id_normal() {
+    fn reduce_application_id_normal() {
         let term = Term::App(Box::new(Term::Abs(0, Box::new(Term::Var(0)))), Box::new(Term::Var(0)));
         assert_eq!(Term::Var(0), normal_form(&term, Strategy::Normal));
     }
 
     #[test]
-    fn test_reduce_application_id_applicative() {
+    fn reduce_application_id_applicative() {
         let term = Term::App(Box::new(Term::Abs(0, Box::new(Term::Var(0)))), Box::new(Term::Var(0)));
         assert_eq!(Term::Var(0), normal_form(&term, Strategy::Applicative));
     }
 
     #[test]
-    fn test_reduce_application_to_omega_normal() {
+    fn reduce_application_to_omega_normal() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_reduce_application_to_omega_applicative() {
+    fn reduce_application_to_omega_applicative() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reduce_application_to_id() {
+    fn reduce_application_to_id() {
         let x = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let term = Term::App(Box::new(x), Box::new(id));
@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eq_id() {
+    fn eq_id() {
         let id0 = Term::Abs(0, Box::new(Term::Var(0)));
         let id1 = Term::Abs(1, Box::new(Term::Var(1)));
 
@@ -213,28 +213,36 @@ mod tests {
     }
 
     #[test]
-    fn test_format_var() {
+    fn format_var() {
         let var = Term::Var(0);
 
         assert_eq!("0", format!("{}", var));
     }
 
     #[test]
-    fn test_format_id() {
+    fn format_id() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
 
         assert_eq!("\\0. 0", format!("{}", id));
     }
 
     #[test]
-    fn test_format_fst() {
+    fn format_fst() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
 
         assert_eq!("\\1. \\0. 1", format!("{}", fst));
     }
 
     #[test]
-    fn test_format_application_to_omega() {
+    fn format_app_to_abs_in_abs() {
+        let term = Term::from_str("\\1. 1 \\0. 0");
+
+        assert_eq!(true, term.is_ok());
+        assert_eq!("\\1. 1 \\0. 0", format!("{}", term.unwrap()));
+    }
+
+    #[test]
+    fn format_application_to_omega() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -245,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_var() {
+    fn from_str_var() {
         let term = Term::from_str("0");
 
         assert_eq!(true, term.is_ok());
@@ -253,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_id() {
+    fn from_str_id() {
         let term = Term::from_str("\\0.0");
         let id = Term::Abs(0, Box::new(Term::Var(0)));
 
@@ -262,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_id_whitespaced() {
+    fn from_str_id_whitespaced() {
         let term = Term::from_str("\\0. 0");
         let id = Term::Abs(0, Box::new(Term::Var(0)));
 
@@ -271,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_fst() {
+    fn from_str_fst() {
         let term = Term::from_str("\\1.\\0.1");
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
 
@@ -280,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_fst_whitespaced() {
+    fn from_str_fst_whitespaced() {
         let term = Term::from_str("\\1. \\0. 1");
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
 
@@ -289,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_omega_redundant_parentheses() {
+    fn from_str_omega_redundant_parentheses() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
@@ -302,20 +310,20 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_omega() {
+    fn from_str_omega() {
         let fst = Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(1)))));
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let omega = Term::Abs(0, Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))));
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
         let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
-        let converted = Term::from_str("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) (\\0. 0 0))");
+        let converted = Term::from_str("(\\1. \\0. 1) (\\0. 0) ((\\0. 0 0) \\0. 0 0)");
 
         assert_eq!(true, converted.is_ok());
         assert_eq!(term, converted.unwrap());
     }
 
     #[test]
-    fn test_from_str_abs_in_abs_without_parentheses() {
+    fn from_str_abs_in_abs_without_parentheses() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let term = Term::Abs(1, Box::new(Term::App(Box::new(Term::Var(1)), Box::new(id))));
         let converted = Term::from_str("\\1. 1 \\0. 0");
@@ -325,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_app_three_times() {
+    fn from_str_app_three_times() {
         let term = Term::Abs(0, Box::new(Term::App(Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))));
         let converted = Term::from_str("\\0. 0 0 0");
 
@@ -334,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_app_four_times() {
+    fn from_str_app_four_times() {
         let term = Term::Abs(0, Box::new(Term::App(Box::new(Term::App(Box::new(Term::App(Box::new(Term::Var(0)), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))), Box::new(Term::Var(0)))));
         let converted = Term::from_str("\\0. 0 0 0 0");
 
@@ -343,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_abs_app_four_times() {
+    fn from_str_abs_app_four_times() {
         let term = Term::Abs(
             4, Box::new(Term::Abs(
                 3, Box::new(Term::Abs(
@@ -351,13 +359,13 @@ mod tests {
                         1, Box::new(Term::App(
                             Box::new(Term::App(
                                 Box::new(Term::App(
-                                    Box::new(Term::Var(1)), Box::new(Term::Var(2))
-                                )), Box::new(Term::Var(3))
-                            )), Box::new(Term::Var(4))
-                        ))
-                    ))
-                ))
-            ))
+                                    Box::new(Term::Var(1)), Box::new(Term::Var(2)),
+                                )), Box::new(Term::Var(3)),
+                            )), Box::new(Term::Var(4)),
+                        )),
+                    )),
+                )),
+            )),
         );
         let converted = Term::from_str("\\4. \\3. \\2. \\1. 1 2 3 4");
 
@@ -366,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_outer_parentheses() {
+    fn from_str_outer_parentheses() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let converted = Term::from_str("(\\0. 0)");
 
@@ -375,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_many_outer_parentheses() {
+    fn from_str_many_outer_parentheses() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let converted = Term::from_str("((\\0. 0))");
 
@@ -384,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_redundant_parentheses() {
+    fn from_str_redundant_parentheses() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let converted = Term::from_str("\\0. (0)");
 
