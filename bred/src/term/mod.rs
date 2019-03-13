@@ -5,7 +5,6 @@ use std::str::FromStr;
 use std::ops::Deref;
 
 pub use parser::ParseError;
-use parser::Parser;
 
 #[derive(Debug, Clone)]
 pub enum Term {
@@ -99,7 +98,7 @@ impl FromStr for Term {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Parser::parse(s)
+        parser::parse(s)
     }
 }
 
