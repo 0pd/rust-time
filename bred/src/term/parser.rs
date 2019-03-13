@@ -8,14 +8,12 @@ pub struct Parser {}
 
 impl Parser {
     pub fn parse(s: &str) -> Result<Term, ParseError> {
-        Self::parse_term(s).map(|(term, _)| { term }).ok_or(ParseError {})
+        Self::parse_term(Self::skip_whitespace(s)).map(|(term, _)| { term }).ok_or(ParseError {})
     }
 
     fn parse_term(s: &str) -> Option<(Term, &str)> {
-        Some(()).and_then(|_| {
-            Self::parse_app(s).or_else(|| {
-                Self::parse_term_in_parentheses(s)
-            })
+        Self::parse_app(s).or_else(|| {
+            Self::parse_term_in_parentheses(s)
         })
     }
 
