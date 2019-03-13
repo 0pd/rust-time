@@ -13,6 +13,67 @@ pub enum Term {
     Var(u32),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Strategy {
+    Normal,
+    Applicative,
+}
+
+impl Term {
+    pub fn normal_form(self, strategy: Strategy) -> Term {
+        if let Some(term) = self.reduce(strategy) {
+            term.normal_form(strategy)
+        } else {
+            self
+        }
+    }
+
+    fn reduce(&self, strategy: Strategy) -> Option<Term> {
+        match self {
+            Term::App(f, a) => f.apply(&a, strategy),
+            Term::Abs(v, f) => f.reduce(strategy).map(|t| Term::Abs(*v, Box::new(t))),
+            _ => None
+        }
+    }
+
+    fn apply(&self, arg: &Term, strategy: Strategy) -> Option<Term> {
+        match strategy {
+            Strategy::Normal => self.reduce(strategy).map_or_else(|| {
+                if let Term::Abs(_, b) = self {
+                    Some(b.substitute(0, arg))
+                } else {
+                    arg.reduce(strategy).map(|term| Term::App(Box::new(self.clone()), Box::new(term)))
+                }
+            }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) }),
+            Strategy::Applicative => arg.reduce(strategy).map_or_else(|| {
+                if let Term::Abs(_, b) = self {
+                    Some(b.substitute(0, arg))
+                } else {
+                    None
+                }
+            }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) })
+        }
+    }
+
+    fn substitute(&self, var: u32, arg: &Term) -> Term {
+        match self {
+            Term::App(f, a) => Term::App(Box::new(f.substitute(var, arg)), Box::new(a.substitute(var, arg))),
+            Term::Abs(v, f) => Term::Abs(*v, Box::new(f.substitute(var + 1, &arg.shift(1, 0)))),
+            Term::Var(v) if *v == var => arg.clone(),
+            Term::Var(_) => self.clone()
+        }
+    }
+
+    fn shift(&self, d: u32, c: u32) -> Term {
+        match self {
+            Term::App(f, a) => Term::App(Box::new(f.shift(d, c)), Box::new(a.shift(d, c))),
+            Term::Abs(v, f) => Term::Abs(*v, Box::new(f.shift(d, c + 1))),
+            Term::Var(v) if *v < c => Term::Var(*v),
+            Term::Var(v) => Term::Var(v + d)
+        }
+    }
+}
+
 impl PartialEq for Term {
     fn eq(&self, other: &Term) -> bool {
         match self {
@@ -28,7 +89,7 @@ impl PartialEq for Term {
                     if v_self == v_other {
                         f_self == f_other
                     } else {
-                        *f_self.deref() == substitute(*v_other, &Term::Var(*v_self), f_other)
+                        *f_self.deref() == f_other.substitute(*v_other, &Term::Var(*v_self))
                     }
                 } else {
                     false
@@ -102,64 +163,6 @@ impl FromStr for Term {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Strategy {
-    Normal,
-    Applicative,
-}
-
-pub fn normal_form(term: &Term, strategy: Strategy) -> Term {
-    match reduce(term, strategy) {
-        Some(t) => normal_form(&t, strategy),
-        None => term.clone(),
-    }
-}
-
-fn reduce(term: &Term, strategy: Strategy) -> Option<Term> {
-    match term {
-        Term::App(f, a) => handle_app(f, a, strategy),
-        Term::Abs(v, f) => reduce(f, strategy).map(|t| Term::Abs(*v, Box::new(t))),
-        _ => None
-    }
-}
-
-fn handle_app(fun: &Term, arg: &Term, strategy: Strategy) -> Option<Term> {
-    match strategy {
-        Strategy::Normal => reduce(fun, strategy).map_or_else(|| {
-            if let Term::Abs(_, b) = fun {
-                Some(substitute(0, arg, b))
-            } else {
-                reduce(arg, strategy).map(|term| Term::App(Box::new(fun.clone()), Box::new(term)))
-            }
-        }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) }),
-        Strategy::Applicative => reduce(arg, strategy).map_or_else(|| {
-            if let Term::Abs(_, b) = fun {
-                Some(substitute(0, arg, b))
-            } else {
-                None
-            }
-        }, |term| { Some(Term::App(Box::new(term), Box::new(arg.clone()))) })
-    }
-}
-
-fn substitute(var: u32, arg: &Term, function: &Term) -> Term {
-    match function {
-        Term::App(f, a) => Term::App(Box::new(substitute(var, arg, f)), Box::new(substitute(var, arg, a))),
-        Term::Abs(v, f) => Term::Abs(*v, Box::new(substitute(var + 1, &shift(1, 0, arg), f))),
-        Term::Var(v) if *v == var => arg.clone(),
-        Term::Var(_) => function.clone()
-    }
-}
-
-fn shift(d: u32, c: u32, term: &Term) -> Term {
-    match term {
-        Term::App(f, a) => Term::App(Box::new(shift(d, c, f)), Box::new(shift(d, c, a))),
-        Term::Abs(v, f) => Term::Abs(*v, Box::new(shift(d, c + 1, f))),
-        Term::Var(v) if *v < c => Term::Var(*v),
-        Term::Var(v) => Term::Var(v + d)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,37 +170,37 @@ mod tests {
     #[test]
     fn reduce_var_normal() {
         let var = Term::Var(0);
-        assert_eq!(var, normal_form(&var, Strategy::Normal));
+        assert_eq!(var.clone(), var.normal_form(Strategy::Normal));
     }
 
     #[test]
     fn reduce_var_applicative() {
         let var = Term::Var(0);
-        assert_eq!(var, normal_form(&var, Strategy::Applicative));
+        assert_eq!(var.clone(), var.normal_form(Strategy::Applicative));
     }
 
     #[test]
     fn reduce_id_normal() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
-        assert_eq!(id, normal_form(&id, Strategy::Normal));
+        assert_eq!(id.clone(), id.normal_form(Strategy::Normal));
     }
 
     #[test]
     fn reduce_id_applicative() {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
-        assert_eq!(id, normal_form(&id, Strategy::Applicative));
+        assert_eq!(id.clone(), id.normal_form(Strategy::Applicative));
     }
 
     #[test]
     fn reduce_application_id_normal() {
         let term = Term::App(Box::new(Term::Abs(0, Box::new(Term::Var(0)))), Box::new(Term::Var(0)));
-        assert_eq!(Term::Var(0), normal_form(&term, Strategy::Normal));
+        assert_eq!(Term::Var(0), term.normal_form(Strategy::Normal));
     }
 
     #[test]
     fn reduce_application_id_applicative() {
         let term = Term::App(Box::new(Term::Abs(0, Box::new(Term::Var(0)))), Box::new(Term::Var(0)));
-        assert_eq!(Term::Var(0), normal_form(&term, Strategy::Applicative));
+        assert_eq!(Term::Var(0), term.normal_form(Strategy::Applicative));
     }
 
     #[test]
@@ -208,7 +211,7 @@ mod tests {
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
         let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
-        assert_eq!(id, normal_form(&term, Strategy::Normal));
+        assert_eq!(id, term.normal_form(Strategy::Normal));
     }
 
     #[test]
@@ -220,7 +223,7 @@ mod tests {
         let big_omega = Term::App(Box::new(omega.clone()), Box::new(omega));
         let term = Term::App(Box::new(Term::App(Box::new(fst), Box::new(id.clone()))), Box::new(big_omega));
 
-        assert_eq!(id, normal_form(&term, Strategy::Applicative));
+        assert_eq!(id, term.normal_form(Strategy::Applicative));
     }
 
     #[test]
@@ -229,7 +232,7 @@ mod tests {
         let id = Term::Abs(0, Box::new(Term::Var(0)));
         let term = Term::App(Box::new(x), Box::new(id));
 
-        assert_eq!(Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(0))))), normal_form(&term, Strategy::Normal));
+        assert_eq!(Term::Abs(1, Box::new(Term::Abs(0, Box::new(Term::Var(0))))), term.normal_form(Strategy::Normal));
     }
 
     #[test]
