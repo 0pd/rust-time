@@ -65,7 +65,7 @@ impl<T> TreeSet<T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
+        self.len() == 0
     }
 }
 

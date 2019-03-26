@@ -2,10 +2,10 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 use std::ops::Index;
 use std::iter::FromIterator;
+use self::node::*;
 
 pub struct TreeMap<K, V> {
-    _k: PhantomData<K>,
-    _v: PhantomData<V>,
+    root: RootNode<K, V>,
     length: usize,
 }
 
@@ -31,17 +31,21 @@ pub struct Values<'a, K, V> {
 
 impl<K: Ord, V> TreeMap<K, V> {
     pub fn new() -> TreeMap<K, V> {
-        unimplemented!()
+        TreeMap {
+            root: RootNode::new(),
+            length: 0
+        }
     }
 
     pub fn clear(&mut self) {
-        unimplemented!()
+        self.root = RootNode::new();
+        self.length = 0;
     }
 
     pub fn get<Q>(&self, key: &Q) -> Option<&V>
         where K: Borrow<Q>,
               Q: Ord + ?Sized {
-        unimplemented!()
+        self.root.search(key)
     }
 
     pub fn get_key_value<Q>(&self, key: &Q) -> Option<(&K, &V)>
@@ -53,7 +57,7 @@ impl<K: Ord, V> TreeMap<K, V> {
     pub fn contains_key<Q>(&self, key: &Q) -> bool
         where K: Borrow<Q>,
               Q: Ord + ?Sized {
-        unimplemented!()
+        self.get(key).is_some()
     }
 
     pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
@@ -150,6 +154,126 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
 
     fn next(&mut self) -> Option<&'a V> {
         unimplemented!()
+    }
+}
+
+mod node {
+    use std::rc::{Weak, Rc};
+    use std::borrow::Borrow;
+    use std::cmp::Ordering;
+
+    pub struct RootNode<K, V> {
+        node: Option<Rc<Node<K, V>>>
+    }
+
+    impl<K, V> RootNode<K, V> {
+        pub fn new() -> RootNode<K, V> {
+            RootNode {
+                node: None
+            }
+        }
+
+        pub fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            if let Some(node) = self.node.borrow() {
+                node.search(key)
+            } else {
+                None
+            }
+        }
+    }
+
+    trait NodeT<K, V> {
+        fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized;
+    }
+
+    enum Node<K, V> {
+        Leaf(LeafNode<K, V>),
+        TwoNode(TwoNode<K, V>),
+        ThreeNode(ThreeNode<K, V>),
+    }
+
+    impl<K, V> NodeT<K, V> for Node<K, V> {
+        fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            match self {
+                Node::Leaf(leaf) => {
+                    leaf.search(key)
+                }
+                Node::TwoNode(two) => {
+                    two.search(key)
+                }
+                Node::ThreeNode(three) => {
+                    three.search(key)
+                }
+            }
+        }
+    }
+
+    struct LeafNode<K, V> {
+        key: K,
+        value: V,
+        parent: Weak<Node<K, V>>,
+    }
+
+    impl<K, V> NodeT<K, V> for LeafNode<K, V> {
+        fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            if let Ordering::Equal = key.cmp(self.key.borrow()) {
+                Some(self.value.borrow())
+            } else {
+                None
+            }
+        }
+    }
+
+    struct TwoNode<K, V> {
+        right_min: Rc<K>,
+        left_child: Rc<Node<K, V>>,
+        right_child: Rc<Node<K, V>>,
+        parent: Weak<Node<K, V>>,
+    }
+
+    impl<K, V> NodeT<K, V> for TwoNode<K, V> {
+        fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            if let Ordering::Less = key.cmp((*self.right_min).borrow()) {
+                self.left_child.search(key)
+            } else {
+                self.right_child.search(key)
+            }
+        }
+    }
+
+    struct ThreeNode<K, V> {
+        middle_min: Rc<K>,
+        right_min: Rc<K>,
+        left_child: Rc<Node<K, V>>,
+        middle_child: Rc<Node<K, V>>,
+        right_child: Rc<Node<K, V>>,
+        parent: Weak<Node<K, V>>,
+    }
+
+    impl<K, V> NodeT<K, V> for ThreeNode<K, V> {
+        fn search<Q>(&self, key: &Q) -> Option<&V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            if let Ordering::Less = key.cmp((*self.right_min).borrow()) {
+                if let Ordering::Less = key.cmp((*self.right_min).borrow()) {
+                    self.left_child.search(key)
+                } else {
+                    self.middle_child.search(key)
+                }
+            } else {
+                self.right_child.search(key)
+            }
+        }
     }
 }
 
