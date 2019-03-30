@@ -33,7 +33,7 @@ impl<K: Ord, V> TreeMap<K, V> {
     pub fn new() -> TreeMap<K, V> {
         TreeMap {
             root: RootNode::new(),
-            length: 0
+            length: 0,
         }
     }
 
@@ -45,13 +45,13 @@ impl<K: Ord, V> TreeMap<K, V> {
     pub fn get<Q>(&self, key: &Q) -> Option<&V>
         where K: Borrow<Q>,
               Q: Ord + ?Sized {
-        self.root.search(key)
+        self.get_key_value(key).map(|(k, v)| v)
     }
 
     pub fn get_key_value<Q>(&self, key: &Q) -> Option<(&K, &V)>
         where K: Borrow<Q>,
               Q: Ord + ?Sized {
-        unimplemented!()
+        self.root.search(key)
     }
 
     pub fn contains_key<Q>(&self, key: &Q) -> bool
@@ -67,13 +67,23 @@ impl<K: Ord, V> TreeMap<K, V> {
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        unimplemented!()
+        let old_value = self.root.insert(key, value);
+        if old_value.is_none() {
+            self.length += 1;
+        }
+
+        old_value
     }
 
     pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
         where K: Borrow<Q>,
               Q: Ord + ?Sized {
-        unimplemented!()
+        let old_value = self.root.remove(key);
+        if old_value.is_some() {
+            self.length -= 1;
+        }
+
+        old_value
     }
 
     pub fn entry(&mut self, key: K) -> Entry<K, V> {
@@ -105,8 +115,13 @@ impl<K, V> TreeMap<K, V> {
 
 impl<K, V> FromIterator<(K, V)> for TreeMap<K, V>
     where K: Ord {
-    fn from_iter<I: IntoIterator<Item=(K, V)>>(iter: I) -> Self {
-        unimplemented!()
+    fn from_iter<I: IntoIterator<Item=(K, V)>>(iter: I) -> TreeMap<K, V> {
+        let mut map = TreeMap::new();
+        for (key, value) in iter {
+            map.insert(key, value);
+        }
+
+        map
     }
 }
 
@@ -173,7 +188,7 @@ mod node {
             }
         }
 
-        pub fn search<Q>(&self, key: &Q) -> Option<&V>
+        pub fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized {
             if let Some(node) = self.node.borrow() {
@@ -182,10 +197,88 @@ mod node {
                 None
             }
         }
+
+        pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+            if self.node.is_none() {
+                self.node = Some(Rc::new(Node::Leaf(LeafNode {
+                    key,
+                    value,
+                    parent: Weak::default(),
+                })));
+
+                None
+            } else {
+                unimplemented!()
+            }
+        }
+
+        pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
+            where K: Borrow<Q>,
+                  Q: Ord + ?Sized {
+            if self.node.is_none() {
+                None
+            } else {
+                unimplemented!()
+            }
+        }
+    }
+
+    enum SearchResult<'a, K, V> {
+        Found(Option<(&'a K, &'a V)>),
+        GoDown(Rc<Node<K, V>>)
+    }
+
+    fn search<K, V, Q>(node: Node<K, V>, key: &Q) -> Option<(&K, &V)>
+        where K: Borrow<Q>,
+              Q: Ord + ?Sized {
+        let mut current = Rc::new(node);
+        loop {
+            match search_internal(current, key) {
+                SearchResult::Found(result) => {
+                    return result;
+                }
+                SearchResult::GoDown(node) => {
+                    current = node;
+                }
+            }
+        }
+    }
+
+    fn search_internal<K, V, Q>(node: Rc<Node<K, V>>, key: &Q) -> SearchResult<K, V>
+        where K: Borrow<Q>,
+              Q: Ord + ?Sized {
+        match node.clone().borrow() {
+            Node::Leaf(leaf) => {
+                let result = if let Ordering::Equal = key.cmp(leaf.key.borrow()) {
+                    Some((&leaf.key, &leaf.value))
+                } else {
+                    None
+                };
+                SearchResult::Found(result)
+            }
+            Node::TwoNode(two) => {
+                if let Ordering::Less = key.cmp((*two.right_min).borrow()) {
+                    SearchResult::GoDown(two.left_child.clone())
+                } else {
+                    SearchResult::GoDown(two.right_child.clone())
+                }
+            }
+            Node::ThreeNode(three) => {
+                if let Ordering::Less = key.cmp((*three.right_min).borrow()) {
+                    if let Ordering::Less = key.cmp((*three.right_min).borrow()) {
+                        SearchResult::GoDown(three.left_child.clone())
+                    } else {
+                        SearchResult::GoDown(three.middle_child.clone())
+                    }
+                } else {
+                    SearchResult::GoDown(three.right_child.clone())
+                }
+            }
+        }
     }
 
     trait NodeT<K, V> {
-        fn search<Q>(&self, key: &Q) -> Option<&V>
+        fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized;
     }
@@ -197,7 +290,7 @@ mod node {
     }
 
     impl<K, V> NodeT<K, V> for Node<K, V> {
-        fn search<Q>(&self, key: &Q) -> Option<&V>
+        fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized {
             match self {
@@ -221,11 +314,11 @@ mod node {
     }
 
     impl<K, V> NodeT<K, V> for LeafNode<K, V> {
-        fn search<Q>(&self, key: &Q) -> Option<&V>
+        fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized {
             if let Ordering::Equal = key.cmp(self.key.borrow()) {
-                Some(self.value.borrow())
+                Some((&self.key, &self.value))
             } else {
                 None
             }
@@ -240,7 +333,7 @@ mod node {
     }
 
     impl<K, V> NodeT<K, V> for TwoNode<K, V> {
-        fn search<Q>(&self, key: &Q) -> Option<&V>
+        fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized {
             if let Ordering::Less = key.cmp((*self.right_min).borrow()) {
@@ -261,7 +354,7 @@ mod node {
     }
 
     impl<K, V> NodeT<K, V> for ThreeNode<K, V> {
-        fn search<Q>(&self, key: &Q) -> Option<&V>
+        fn search<Q>(&self, key: &Q) -> Option<(&K, &V)>
             where K: Borrow<Q>,
                   Q: Ord + ?Sized {
             if let Ordering::Less = key.cmp((*self.right_min).borrow()) {

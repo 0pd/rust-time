@@ -71,7 +71,12 @@ impl<T> TreeSet<T> {
 
 impl<T: Ord> FromIterator<T> for TreeSet<T> {
     fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> TreeSet<T> {
-        unimplemented!()
+        let mut set = TreeSet::new();
+        for item in iter {
+            set.insert(item);
+        }
+
+        set
     }
 }
 
